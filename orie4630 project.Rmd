@@ -1,0 +1,240 @@
+---
+title: "orie4630 project"
+output: html_document
+date: "2024-12-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(quantmod)
+```
+
+```{r}
+drug_manufacturers = c("LLY", "JNJ", "ABBV", "MRK")
+
+get_adj_prices <- function(symbol, start, end) {
+  df = getSymbols(symbol, from = start, to = end, auto.assign = FALSE)
+  col_name <- paste(symbol, ".Adjusted", sep="")
+  return(df[,col_name])
+}
+
+lly = get_adj_prices("LLY", "2017-01-01", "2019-12-31")
+head(lly)
+
+jnj = get_adj_prices("JNJ", "2017-01-01", "2019-12-31")
+head(jnj)
+
+abbv = get_adj_prices("ABBV", "2017-01-01", "2019-12-31")
+head(abbv)
+
+tbill1mo = getSymbols("DGS1MO", from = "2017-01-01", to = "2019-12-31", src="FRED", auto.assign = FALSE)
+tbill1mo = na.omit(tbill1mo[,"DGS1MO"])
+head(tbill1mo)
+
+```
+
+```{r}
+lly_ret = dailyReturn(lly)
+jnj_ret = dailyReturn(jnj)
+abbv_ret = dailyReturn(abbv)
+
+calc_cum_ret <- function(ret) {
+  gross_ret = ret + 1
+  return(cumprod(gross_ret) - 1)
+}
+```
+
+```{r}
+plot(calc_cum_ret(lly_ret), type = "l", col = "blue", main = "Cumulative Returns", 
+     ylab = "Return", xlab = "Days")
+lines(calc_cum_ret(jnj_ret), col = "green")
+lines(calc_cum_ret(abbv_ret), col = "red")
+legend("topleft", legend = c("LLY", "JNJ", "ABBV"), col = c("blue", "green", "red"), lty = 1)
+
+
+```
+
+```{r}
+get_daily_return <- function(symbol, start, end) {
+  df = getSymbols(symbol, from = start, to = end, auto.assign = FALSE)
+  col_name <- paste(symbol, ".Adjusted", sep="")
+  return(dailyReturn(df[,col_name]))
+}
+
+symbols <- c("LLY", "JNJ", "ABBV")
+
+periods <- list(
+  c("2017-01-01", "2019-12-31"),
+  c("2020-01-01", "2022-12-31")
+)
+
+mean_mat <- matrix(NA, nrow = length(symbols), ncol = length(periods))
+sd_mat <- matrix(NA, nrow = length(symbols), ncol = length(periods))
+
+# Loop over each symbol and period to fill in the matrices
+for (i in seq_along(symbols)) {
+  for (j in seq_along(periods)) {
+    start_date <- periods[[j]][1]
+    end_date <- periods[[j]][2]
+    
+    # Get daily returns
+    returns <- get_daily_return(symbols[i], start_date, end_date)
+    
+    # Compute mean and sd
+    mean_mat[i, j] <- mean(returns, na.rm = TRUE)
+    sd_mat[i, j] <- sd(returns, na.rm = TRUE)
+  }
+}
+
+# Create data frames with appropriate row and column names
+mean_df <- data.frame(mean_mat, row.names = symbols)
+colnames(mean_df) <- c("2017-2019", "2020-2022")
+
+sd_df <- data.frame(sd_mat, row.names = symbols)
+colnames(sd_df) <- c("2017-2019", "2020-2022")
+
+# Print the results
+mean_df
+sd_df
+```
+
+```{r}
+rf = tbill1mo/(360 * 100)
+
+# mean excess returns
+mu_rf.vec = c(mean(lly_ret - rf), mean(jnj_ret - rf), mean(abbv_ret - rf))
+cov.mat = cov(cbind(lly_ret, jnj_ret, abbv_ret))
+rownames(cov.mat) <- symbols
+colnames(cov.mat) <- symbols
+
+num = solve(cov.mat)%*%(mu_rf.vec)
+den = as.numeric(t(rep(1,3))%*%solve(cov.mat)%*%(mu_rf.vec))
+tan.vec = num/den
+
+#mean excess return of tan pf
+
+mu_tan_rf = as.numeric(crossprod(tan.vec, mu_rf.vec))
+sd_tan = sqrt(as.numeric(t(tan.vec)%*%cov.mat%*%tan.vec))
+
+tan.vec
+
+lly_sr = mu_rf.vec[1]/sqrt(diag(cov.mat)[1])
+jnj_sr = mu_rf.vec[2]/sqrt(diag(cov.mat)[2])
+abbv_sr = mu_rf.vec[3]/sqrt(diag(cov.mat)[3])
+pf_sr = mu_tan_rf/sd_tan
+
+sharpe_ratios = data.frame(
+  Portfolio = c("LLY", "JNJ", "ABBV", "Tan PF (opt)"),
+  Sharpe_Ratio = c(lly_sr, jnj_sr, abbv_sr, pf_sr),
+  SD = c(sqrt(diag(cov.mat)[1]), sqrt(diag(cov.mat)[2]), sqrt(diag(cov.mat)[3]), sd_tan)
+)
+
+print(sharpe_ratios, row.names = FALSE)
+```
+
+```{r}
+sp500 = getSymbols("^GSPC", from = "2017-01-01", to = "2019-12-31", auto.assign = FALSE)
+sp500 = sp500[,'GSPC.Adjusted']
+sp500_ret = dailyReturn(sp500)
+
+lly_ex = lly_ret - rf
+jnj_ex = jnj_ret - rf
+abbv_ex = abbv_ret - rf
+pf_ex = (tan.vec[1] * lly_ex + tan.vec[2] * jnj_ex + tan.vec[3] * abbv_ex)
+spy_ex = sp500_ret - rf
+
+lly_fit <- lm(lly_ex ~ spy_ex)
+jnj_fit <- lm(jnj_ex ~ spy_ex)
+abbv_fit <- lm(abbv_ex ~ spy_ex)
+pf_fit <- lm(pf_ex ~ spy_ex)
+
+summary(lly_fit)
+summary(jnj_fit)
+summary(abbv_fit)
+
+alpha_beta = data.frame(
+  Portfolio = c("LLY", "JNJ", "ABBV", "Tan PF (opt)"),
+  alpha_values = c(mean(lly_ex - spy_ex), mean(jnj_ex - spy_ex), mean(abbv_ex - spy_ex), mean(pf_ex - spy_ex)),
+  beta_values = c(lly_fit$coefficients[2], jnj_fit$coefficients[2], abbv_fit$coefficients[2], pf_fit$coefficients[2])
+)
+
+print(alpha_beta)
+```
+
+```{r}
+tbill1mo_2 = getSymbols("DGS1MO", from = "2020-01-01", to = "2022-12-31", src="FRED", auto.assign = FALSE)
+tbill1mo_2 = na.omit(tbill1mo_2[,"DGS1MO"])
+rf_2 = tbill1mo_2/(360 * 100)
+
+sp500_2 = getSymbols("^GSPC", from = "2020-01-01", to = "2022-12-31", auto.assign = FALSE)
+sp500_2 = sp500_2[,'GSPC.Adjusted']
+sp500_ret_2 = dailyReturn(sp500_2)
+
+lly_ret_2 = get_daily_return("LLY", "2020-01-01", "2022-12-31")
+jnj_ret_2 = get_daily_return("JNJ", "2020-01-01", "2022-12-31")
+abbv_ret_2 = get_daily_return("ABBV", "2020-01-01", "2022-12-31")
+
+lly_ex_2 = lly_ret_2 - rf_2
+jnj_ex_2 = jnj_ret_2 - rf_2
+abbv_ex_2 = abbv_ret_2 - rf_2
+pf_ex_2 = (tan.vec[1] * lly_ex_2 + tan.vec[2] * jnj_ex_2 + tan.vec[3] * abbv_ex_2)
+spy_ex_2 = sp500_ret_2 - rf_2
+
+lly_fit_2 <- lm(lly_ex_2 ~ spy_ex_2)
+jnj_fit_2 <- lm(jnj_ex_2 ~ spy_ex_2)
+abbv_fit_2 <- lm(abbv_ex_2 ~ spy_ex_2)
+pf_fit_2 <- lm(pf_ex_2 ~ spy_ex_2)
+
+summary(lly_fit_2)
+summary(jnj_fit_2)
+summary(abbv_fit_2)
+
+alpha_beta_2 = data.frame(
+  Portfolio = c("LLY", "JNJ", "ABBV", "Tan PF (opt)"),
+  alpha_values = c(mean(lly_ex_2 - spy_ex_2), mean(jnj_ex_2 - spy_ex_2), mean(abbv_ex_2 - spy_ex_2), mean(pf_ex_2 - spy_ex_2)),
+  beta_values = c(lly_fit_2$coefficients[2], jnj_fit_2$coefficients[2], abbv_fit_2$coefficients[2], pf_fit_2$coefficients[2])
+)
+
+print(alpha_beta_2)
+
+
+```
+
+```{r}
+S = 1000
+#VaR confidence level =1-alpha
+calc_np <- function(alpha, ret) {
+  VaR_NP = -S*as.numeric(quantile(ret,alpha))
+  L = -S*ret
+  ES_NP = mean(L[L>VaR_NP])
+  NP = c(VaR_NP, ES_NP)
+  names(NP) = c("VaR", "ES")
+  return(NP)
+}
+
+lly_np = calc_np(0.05, lly_ret)
+jnj_np = calc_np(0.05, jnj_ret)
+abbv_np = calc_np(0.05, abbv_ret)
+
+results_df <- data.frame(rbind(lly_np, jnj_np, abbv_np))
+
+rownames(results_df) <- c("LLY", "JNJ", "ABBV")
+
+results_df
+```
+
+
+
+
+
+```{r}
+lly_np_2 = calc_np(0.05, lly_ret_2)
+jnj_np_2 = calc_np(0.05, jnj_ret_2)
+abbv_np_2 = calc_np(0.05, abbv_ret_2)
+
+results_df_2 <- data.frame(rbind(lly_np_2, jnj_np_2, abbv_np_2))
+
+rownames(results_df_2) <- c("LLY", "JNJ", "ABBV")
+
+results_df_2
+```
