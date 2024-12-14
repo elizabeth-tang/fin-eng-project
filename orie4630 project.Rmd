@@ -108,30 +108,50 @@ periods <- list(
   c("2020-01-01", "2022-12-31")
 )
 
-mean_mat <- matrix(NA, nrow = length(symbols), ncol = length(periods))
-sd_mat <- matrix(NA, nrow = length(symbols), ncol = length(periods))
-
-for (i in seq_along(symbols)) {
-  for (j in seq_along(periods)) {
-    start_date <- periods[[j]][1]
-    end_date <- periods[[j]][2]
-    
-    returns <- get_daily_return(symbols[i], start_date, end_date)
-    
-    mean_mat[i, j] <- mean(returns, na.rm = TRUE)
-    sd_mat[i, j] <- sd(returns, na.rm = TRUE)
+get_stats <- function(symbols, periods) {
+  mean_mat <- matrix(NA, nrow = length(symbols), ncol = length(periods))
+  sd_mat <- matrix(NA, nrow = length(symbols), ncol = length(periods))
+  
+  for (i in seq_along(symbols)) {
+    for (j in seq_along(periods)) {
+      start_date <- periods[[j]][1]
+      end_date <- periods[[j]][2]
+      
+      returns <- get_daily_return(symbols[i], start_date, end_date)
+      
+      mean_mat[i, j] <- mean(returns, na.rm = TRUE)
+      sd_mat[i, j] <- sd(returns, na.rm = TRUE)
+    }
   }
+  return(list(mean_mat, sd_mat))
 }
+
+mean_mat = get_stats(symbols, periods)[1]
+sd_mat = get_stats(symbols, periods)[2]
 
 mean_df <- data.frame(mean_mat, row.names = c("TSLA", "TM", "BYDDY", "Auto Industry"))
 colnames(mean_df) <- c("2017-2019", "2020-2022")
 
 sd_df <- data.frame(sd_mat, row.names = c("TSLA", "TM", "BYDDY", "Auto Industry"))
 colnames(sd_df) <- c("2017-2019", "2020-2022")
+
+years <- list(
+  c("2017-01-01", "2017-12-31"),
+  c("2018-01-01", "2018-12-31"),
+  c("2019-01-01", "2019-12-31")
+)
+
+mean_mat_years = get_stats(symbols, years)[1]
+sd_mat_years = get_stats(symbols, years)[2]
+
+mean_df_years <- data.frame(mean_mat_years, row.names = c("TSLA", "TM", "BYDDY", "Auto Industry"))
+colnames(mean_df_years) <- c("2017", "2018", "2019")
+
+sd_df_years <- data.frame(sd_mat_years, row.names = c("TSLA", "TM", "BYDDY", "Auto Industry"))
+colnames(sd_df_years) <- c("2017", "2018", "2019")
 ```
 
-### ** Wherever CARZ appears, it represents the auto manufacturer industry's overall performance
-
+## Split by period
 ### Mean of Daily Returns
 ```{r}
 mean_df
@@ -140,6 +160,17 @@ mean_df
 ### Standard Deviation of Daily Returns
 ```{r}
 sd_df
+```
+
+## Split by year
+### Mean of Daily Returns
+```{r}
+mean_df_years
+```
+
+### Standard Deviation of Daily Returns
+```{r}
+sd_df_years
 ```
 
 ## 3)
@@ -283,7 +314,7 @@ summary(pf_fit)
 
 alpha_beta = data.frame(
   Portfolio = c("TSLA", "TM", "BYDDY", "Auto Industry", "Tan PF (opt)"),
-  alpha_values = c(coef(tsla_fit)["(Intercept)"], coef(tm_fit)["(Intercept)"], coef(byddy_fit)["(Intercept)"], coef(auto_fit)["(Intercept)"], coef(pf_fit)["(Intercept)"]),
+  alpha_values = c(tsla_fit$coefficients[1], tm_fit$coefficients[1], byddy_fit$coefficients[1], auto_fit$coefficients[1], pf_fit$coefficients[1]),
   beta_values = c(tsla_fit$coefficients[2], tm_fit$coefficients[2], byddy_fit$coefficients[2], auto_fit$coefficients[2], pf_fit$coefficients[2])
 )
 
