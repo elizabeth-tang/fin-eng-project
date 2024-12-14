@@ -9,8 +9,11 @@ knitr::opts_chunk$set(echo = TRUE)
 library(quantmod)
 ```
 
+## 1)
+The industry we chose to analyze was Consumers Cyclical - Auto Manufacturers. To represent this industry, we chose 3 companies, Tesla (TSLA), Toyota Motors (TM) and BYD (BYDDY) that had the highest market capitalizations of the listed auto manufacturers. We also chose to use the First Trust S-Network Future Vehicles & Technology ETF (CARZ) as a proxy for overall industry performance. CARZ is the only exchange traded fund that focuses on investing in auto manufacturers with around 101 equities represented. We thought this would be a close approximation since to be eligible for inclusion in the index, a company must be listed on a major recognized stock exchange and engaged in electric and autonomous vehicle manufacturing, enabling technologies or enabling materials.
+
 ```{r}
-drug_manufacturers = c("LLY", "JNJ", "ABBV", "MRK")
+auto_manufacturers = c("TSLA", "TM", "BYDDY")
 
 get_adj_prices <- function(symbol, start, end) {
   df = getSymbols(symbol, from = start, to = end, auto.assign = FALSE)
@@ -18,40 +21,22 @@ get_adj_prices <- function(symbol, start, end) {
   return(df[,col_name])
 }
 
-lly = get_adj_prices("LLY", "2017-01-01", "2019-12-31")
-head(lly)
+# 2017-2019
+tsla = get_adj_prices("TSLA", "2017-01-01", "2019-12-31")
+head(tsla, 2)
 
-jnj = get_adj_prices("JNJ", "2017-01-01", "2019-12-31")
-head(jnj)
+tm = get_adj_prices("TM", "2017-01-01", "2019-12-31")
+head(tm, 2)
 
-abbv = get_adj_prices("ABBV", "2017-01-01", "2019-12-31")
-head(abbv)
+byddy = get_adj_prices("BYDDY", "2017-01-01", "2019-12-31")
+head(byddy, 2)
+
+auto = get_adj_prices("CARZ", "2017-01-01", "2019-12-31")
+head(auto, 2)
 
 tbill1mo = getSymbols("DGS1MO", from = "2017-01-01", to = "2019-12-31", src="FRED", auto.assign = FALSE)
 tbill1mo = na.omit(tbill1mo[,"DGS1MO"])
-head(tbill1mo)
-
-```
-
-```{r}
-lly_ret = dailyReturn(lly)
-jnj_ret = dailyReturn(jnj)
-abbv_ret = dailyReturn(abbv)
-
-calc_cum_ret <- function(ret) {
-  gross_ret = ret + 1
-  return(cumprod(gross_ret) - 1)
-}
-```
-
-```{r}
-plot(calc_cum_ret(lly_ret), type = "l", col = "blue", main = "Cumulative Returns", 
-     ylab = "Return", xlab = "Days")
-lines(calc_cum_ret(jnj_ret), col = "green")
-lines(calc_cum_ret(abbv_ret), col = "red")
-legend("topleft", legend = c("LLY", "JNJ", "ABBV"), col = c("blue", "green", "red"), lty = 1)
-
-
+head(tbill1mo, 2)
 ```
 
 ```{r}
@@ -61,7 +46,62 @@ get_daily_return <- function(symbol, start, end) {
   return(dailyReturn(df[,col_name]))
 }
 
-symbols <- c("LLY", "JNJ", "ABBV")
+# 2017-2019
+tsla_ret = dailyReturn(tsla)
+tm_ret = dailyReturn(tm)
+byddy_ret = dailyReturn(byddy)
+auto_ret = dailyReturn(auto)
+
+# 2020-2022
+tbill1mo_2 = getSymbols("DGS1MO", from = "2020-01-01", to = "2022-12-31", src="FRED", auto.assign = FALSE)
+tbill1mo_2 = na.omit(tbill1mo_2[,"DGS1MO"])
+rf_2 = tbill1mo_2/(360 * 100)
+
+sp500_2 = getSymbols("^GSPC", from = "2020-01-01", to = "2022-12-31", auto.assign = FALSE)
+sp500_2 = sp500_2[,'GSPC.Adjusted']
+sp500_ret_2 = dailyReturn(sp500_2)
+
+tsla_ret_2 = get_daily_return("TSLA", "2020-01-01", "2022-12-31")
+tm_ret_2 = get_daily_return("TM", "2020-01-01", "2022-12-31")
+byddy_ret_2 = get_daily_return("BYDDY", "2020-01-01", "2022-12-31")
+auto_ret_2 = get_daily_return("CARZ", "2020-01-01", "2022-12-31")
+
+calc_cum_ret <- function(ret) {
+  gross_ret = ret + 1
+  return(cumprod(gross_ret) - 1)
+}
+```
+
+```{r}
+combined_returns <- cbind(
+  calc_cum_ret(tsla_ret),
+  calc_cum_ret(tm_ret),
+  calc_cum_ret(byddy_ret),
+  calc_cum_ret(auto_ret)
+)
+
+p1 <- plot.xts(
+  combined_returns,
+  type = "l",
+  col = c("blue", "green", "red", "orange"),
+  main = "Cumulative Returns",
+  ylab = "Return",
+  xlab = "Days",
+  ylim = c(-0.2, 1.1)
+)
+
+addLegend(
+  "topleft",
+  c("TSLA", "TM", "BYDDY", "Auto Industry"),
+  col = c("blue", "green", "red", "orange"),
+  lty = c(1,1,1,1)
+)
+
+```
+
+## 2)
+```{r}
+symbols <- c("TSLA", "TM", "BYDDY", "CARZ")
 
 periods <- list(
   c("2017-01-01", "2019-12-31"),
@@ -71,135 +111,229 @@ periods <- list(
 mean_mat <- matrix(NA, nrow = length(symbols), ncol = length(periods))
 sd_mat <- matrix(NA, nrow = length(symbols), ncol = length(periods))
 
-# Loop over each symbol and period to fill in the matrices
 for (i in seq_along(symbols)) {
   for (j in seq_along(periods)) {
     start_date <- periods[[j]][1]
     end_date <- periods[[j]][2]
     
-    # Get daily returns
     returns <- get_daily_return(symbols[i], start_date, end_date)
     
-    # Compute mean and sd
     mean_mat[i, j] <- mean(returns, na.rm = TRUE)
     sd_mat[i, j] <- sd(returns, na.rm = TRUE)
   }
 }
 
-# Create data frames with appropriate row and column names
-mean_df <- data.frame(mean_mat, row.names = symbols)
+mean_df <- data.frame(mean_mat, row.names = c("TSLA", "TM", "BYDDY", "Auto Industry"))
 colnames(mean_df) <- c("2017-2019", "2020-2022")
 
-sd_df <- data.frame(sd_mat, row.names = symbols)
+sd_df <- data.frame(sd_mat, row.names = c("TSLA", "TM", "BYDDY", "Auto Industry"))
 colnames(sd_df) <- c("2017-2019", "2020-2022")
+```
 
-# Print the results
+### ** Wherever CARZ appears, it represents the auto manufacturer industry's overall performance
+
+### Mean of Daily Returns
+```{r}
 mean_df
+```
+
+### Standard Deviation of Daily Returns
+```{r}
 sd_df
 ```
 
+## 3)
 ```{r}
 rf = tbill1mo/(360 * 100)
 
 # mean excess returns
-mu_rf.vec = c(mean(lly_ret - rf), mean(jnj_ret - rf), mean(abbv_ret - rf))
-cov.mat = cov(cbind(lly_ret, jnj_ret, abbv_ret))
-rownames(cov.mat) <- symbols
-colnames(cov.mat) <- symbols
+mu_rf.vec = c(mean(tsla_ret - rf), mean(tm_ret - rf), mean(byddy_ret - rf))
+cov.mat = cov(cbind(tsla_ret, tm_ret, byddy_ret))
+rownames(cov.mat) <- c("TSLA", "TM", "BYDDY")
+colnames(cov.mat) <- c("TSLA", "TM", "BYDDY")
 
 num = solve(cov.mat)%*%(mu_rf.vec)
 den = as.numeric(t(rep(1,3))%*%solve(cov.mat)%*%(mu_rf.vec))
 tan.vec = num/den
 
-#mean excess return of tan pf
-
+# mean excess return of tan pf
 mu_tan_rf = as.numeric(crossprod(tan.vec, mu_rf.vec))
 sd_tan = sqrt(as.numeric(t(tan.vec)%*%cov.mat%*%tan.vec))
 
+# weights of each company in the optimal portfolio
 tan.vec
 
-lly_sr = mu_rf.vec[1]/sqrt(diag(cov.mat)[1])
-jnj_sr = mu_rf.vec[2]/sqrt(diag(cov.mat)[2])
-abbv_sr = mu_rf.vec[3]/sqrt(diag(cov.mat)[3])
+tsla_sr = mu_rf.vec[1]/sqrt(diag(cov.mat)[1])
+tm_sr = mu_rf.vec[2]/sqrt(diag(cov.mat)[2])
+byddy_sr = mu_rf.vec[3]/sqrt(diag(cov.mat)[3])
 pf_sr = mu_tan_rf/sd_tan
+auto_sr = mean(auto_ret - rf)/sd(auto_ret)
 
 sharpe_ratios = data.frame(
-  Portfolio = c("LLY", "JNJ", "ABBV", "Tan PF (opt)"),
-  Sharpe_Ratio = c(lly_sr, jnj_sr, abbv_sr, pf_sr),
-  SD = c(sqrt(diag(cov.mat)[1]), sqrt(diag(cov.mat)[2]), sqrt(diag(cov.mat)[3]), sd_tan)
+  Portfolio = c("TSLA", "TM", "BYDDY", "Auto Industry", "Tan PF (opt)"),
+  Sharpe_Ratio = c(tsla_sr, tm_sr, byddy_sr, auto_sr, pf_sr),
+  SD = c(sqrt(diag(cov.mat)[1]), sqrt(diag(cov.mat)[2]), sqrt(diag(cov.mat)[3]), sd(auto_ret), sd_tan)
 )
 
 print(sharpe_ratios, row.names = FALSE)
 ```
 
+As we can see in the statistics above, the riskiness (standard deviation) of the individual assets vary. TSLA has the highest SD (0.0306), making it the riskiest asset in the portfolio. BYDDY has a slightly lower SD (0.0233), making it less risky than TSLA, but still riskier than TM. TM actually had a SD similar to CARZ (0.0097 and 0.0098, respectively), indicating relatively low volatility in that individual asset. CARZ's low volatility indicates that the industry as a whole is more stable, likely due to diversification across companies. Our optimal portfolio had a SD of 0.0157 which is slightly higher than the overall industry and TM, but much lower than TSLA and BYDDY. This indicates that our optimization process helped reduce risk through diversification.
+
+TSLA had the highest SR (0.0455) among individual assets, offering high returns per unit risk, despite high risk. TM had a SR of 0.0255, which is lower than TSLA, but also lower risk overall. BYDDY had the lowest SR of all individual risks, making it less attractive individually, offering less return per unit risk despite having higher risks than TM. The overall auto industry (CARZ) had a SR of 0.0095 which is relatively low. Our optimal portfolio had the highest SR of 0.0486. This indicates that our portfolio takes advantage of diversification and produces high return for risk. 
+
+Individual investments like Tesla can provide high returns but must be combined with less volatile assets like Toyota or BYD to achieve an efficient portfolio. Tesla’s high Sharpe ratio suggests that it can add value to the portfolio despite its high risk, but relying solely on Tesla would expose the portfolio to excessive volatility. Toyota and BYD are lower-risk assets, but their Sharpe ratios make them less compelling individually. They may still contribute to portfolio stability. By considering these factors, an optimized portfolio, like ours, can greatly outperform the overall auto industry.
+
+
+## 4)
+
+### 2017-2019
+```{r}
+pf_ret = (tan.vec[1] * tsla_ret + tan.vec[2] * tm_ret + tan.vec[3] * byddy_ret)
+combined_returns <- cbind(
+  calc_cum_ret(pf_ret),
+  calc_cum_ret(auto_ret)
+)
+
+p2 <- plot.xts(
+  combined_returns,
+  type = "l",
+  col = c("blue", "green"),
+  main = "Cumulative Returns",
+  ylab = "Return",
+  xlab = "Days",
+  ylim = c(-0.2, 0.8)
+)
+
+addLegend(
+  "topleft",
+  c("Opt PF", "Auto industry"),
+  col = c("blue", "green"),
+  lty = c(1,1,1,1)
+)
+```
+```{r, results="hold"}
+sprintf("SD of Opt PF Daily Return: %s", signif(sd(pf_ret), 3))
+sprintf("SD of Auto Industry Daily Return: %s", signif(sd(auto_ret), 3))
+sprintf("SR of Opt PF Daily Return: %s", signif(mean(pf_ret - rf)/sd(pf_ret), 3))
+sprintf("SR of Auto Industry Daily Return: %s", signif(mean(auto_ret - rf)/sd(auto_ret), 3))
+```
+We can see that our optimized portfolio had higher cumulative returns than the overall auto industry for most of the period. Though our portfolio does have a higher SD (0.0157 vs 0.0098), we can also achieve a significantly higher Sharpe Ratio -- almost 5x higher. Overall, our portfolio achieves higher returns for slightly more risk when compared to the overarching auto manufacturers industry in this period.
+
+### 2020-2022
+```{r}
+pf_ret_2 = (tan.vec[1] * tsla_ret_2 + tan.vec[2] * tm_ret_2 + tan.vec[3] * byddy_ret_2)
+combined_returns <- cbind(
+  calc_cum_ret(pf_ret_2),
+  calc_cum_ret(auto_ret_2)
+)
+
+p3 <- plot.xts(
+  combined_returns,
+  type = "l",
+  col = c("blue", "green"),
+  main = "Cumulative Returns",
+  ylab = "Return",
+  xlab = "Days",
+  ylim = c(-0.4, 3.2)
+)
+
+addLegend(
+  "topleft",
+  c("Opt PF", "Auto industry"),
+  col = c("blue", "green"),
+  lty = c(1,1,1,1)
+)
+```
+
+```{r, results = "hold"}
+sprintf("SD of Opt PF Daily Return: %s", signif(sd(pf_ret_2), 3))
+sprintf("SD of Auto Industry Daily Return: %s", signif(sd(auto_ret_2), 3))
+sprintf("SR of Opt PF Daily Return: %s", signif(mean(pf_ret_2 - rf_2)/sd(pf_ret_2), 3))
+sprintf("SR of Auto Industry Daily Return: %s", signif(mean(auto_ret_2 - rf_2)/sd(auto_ret_2), 3))
+```
+
+In this period, our optimized portfolio had higher cumulative returns than the overall auto industry for the entire period. In this period, our portfolio had a similar SD as the overall industry (0.0245 vs 0.0217) but our Sharpe Ratio was more than 2x higher (0.0467 vs 0.0199). Overall, our portfolio again achieves significantly higher returns for slightly more risk when compared to the overarching auto manufacturers industry in this period.
+Compared to the last period, both our portfolio and the overall industry had much higher cumulative returns but also greater risk and volatility.
+
+## 5)
 ```{r}
 sp500 = getSymbols("^GSPC", from = "2017-01-01", to = "2019-12-31", auto.assign = FALSE)
 sp500 = sp500[,'GSPC.Adjusted']
 sp500_ret = dailyReturn(sp500)
 
-lly_ex = lly_ret - rf
-jnj_ex = jnj_ret - rf
-abbv_ex = abbv_ret - rf
-pf_ex = (tan.vec[1] * lly_ex + tan.vec[2] * jnj_ex + tan.vec[3] * abbv_ex)
+tsla_ex = tsla_ret - rf
+tm_ex = tm_ret - rf
+byddy_ex = byddy_ret - rf
+auto_ex = auto_ret - rf
+pf_ex = (tan.vec[1] * tsla_ex + tan.vec[2] * tm_ex + tan.vec[3] * byddy_ex)
 spy_ex = sp500_ret - rf
 
-lly_fit <- lm(lly_ex ~ spy_ex)
-jnj_fit <- lm(jnj_ex ~ spy_ex)
-abbv_fit <- lm(abbv_ex ~ spy_ex)
+tsla_fit <- lm(tsla_ex ~ spy_ex)
+tm_fit <- lm(tm_ex ~ spy_ex)
+byddy_fit <- lm(byddy_ex ~ spy_ex)
+auto_fit <- lm(auto_ex ~ spy_ex)
 pf_fit <- lm(pf_ex ~ spy_ex)
 
-summary(lly_fit)
-summary(jnj_fit)
-summary(abbv_fit)
+summary(tsla_fit)
+summary(tm_fit)
+summary(byddy_fit)
+summary(auto_fit)
+summary(pf_fit)
 
 alpha_beta = data.frame(
-  Portfolio = c("LLY", "JNJ", "ABBV", "Tan PF (opt)"),
-  alpha_values = c(mean(lly_ex - spy_ex), mean(jnj_ex - spy_ex), mean(abbv_ex - spy_ex), mean(pf_ex - spy_ex)),
-  beta_values = c(lly_fit$coefficients[2], jnj_fit$coefficients[2], abbv_fit$coefficients[2], pf_fit$coefficients[2])
+  Portfolio = c("TSLA", "TM", "BYDDY", "Auto Industry", "Tan PF (opt)"),
+  alpha_values = c(coef(tsla_fit)["(Intercept)"], coef(tm_fit)["(Intercept)"], coef(byddy_fit)["(Intercept)"], coef(auto_fit)["(Intercept)"], coef(pf_fit)["(Intercept)"]),
+  beta_values = c(tsla_fit$coefficients[2], tm_fit$coefficients[2], byddy_fit$coefficients[2], auto_fit$coefficients[2], pf_fit$coefficients[2])
 )
 
 print(alpha_beta)
 ```
 
+All of the alphas were very close to 0 and we were unable to reject the null hypothesis (CAPM) for any of the assets/portfolios.
+Tesla exhibited higher market sensitivity (beta = 1.341).
+Toyota's lower beta (0.686) highlights its stability, while BYD's beta near 1 indicates higher correlation with the market.
+The overall industry had a relatively low beta (0.787), showing relative stability as well.
+The constructed portfolio managed to achieve relatively moderate risk (beta close to 1).
+
+## 6)
 ```{r}
-tbill1mo_2 = getSymbols("DGS1MO", from = "2020-01-01", to = "2022-12-31", src="FRED", auto.assign = FALSE)
-tbill1mo_2 = na.omit(tbill1mo_2[,"DGS1MO"])
-rf_2 = tbill1mo_2/(360 * 100)
-
-sp500_2 = getSymbols("^GSPC", from = "2020-01-01", to = "2022-12-31", auto.assign = FALSE)
-sp500_2 = sp500_2[,'GSPC.Adjusted']
-sp500_ret_2 = dailyReturn(sp500_2)
-
-lly_ret_2 = get_daily_return("LLY", "2020-01-01", "2022-12-31")
-jnj_ret_2 = get_daily_return("JNJ", "2020-01-01", "2022-12-31")
-abbv_ret_2 = get_daily_return("ABBV", "2020-01-01", "2022-12-31")
-
-lly_ex_2 = lly_ret_2 - rf_2
-jnj_ex_2 = jnj_ret_2 - rf_2
-abbv_ex_2 = abbv_ret_2 - rf_2
-pf_ex_2 = (tan.vec[1] * lly_ex_2 + tan.vec[2] * jnj_ex_2 + tan.vec[3] * abbv_ex_2)
+tsla_ex_2 = tsla_ret_2 - rf_2
+tm_ex_2 = tm_ret_2 - rf_2
+byddy_ex_2 = byddy_ret_2 - rf_2
+auto_ex_2 = auto_ret_2 - rf_2
+pf_ex_2 = (tan.vec[1] * tsla_ex_2 + tan.vec[2] * tm_ex_2 + tan.vec[3] * byddy_ex_2)
 spy_ex_2 = sp500_ret_2 - rf_2
 
-lly_fit_2 <- lm(lly_ex_2 ~ spy_ex_2)
-jnj_fit_2 <- lm(jnj_ex_2 ~ spy_ex_2)
-abbv_fit_2 <- lm(abbv_ex_2 ~ spy_ex_2)
+tsla_fit_2 <- lm(tsla_ex_2 ~ spy_ex_2)
+tm_fit_2 <- lm(tm_ex_2 ~ spy_ex_2)
+byddy_fit_2 <- lm(byddy_ex_2 ~ spy_ex_2)
+auto_fit_2 <- lm(auto_ex_2 ~ spy_ex_2)
 pf_fit_2 <- lm(pf_ex_2 ~ spy_ex_2)
 
-summary(lly_fit_2)
-summary(jnj_fit_2)
-summary(abbv_fit_2)
+summary(tsla_fit_2)
+summary(tm_fit_2)
+summary(byddy_fit_2)
+summary(auto_fit_2)
+summary(pf_fit_2)
 
 alpha_beta_2 = data.frame(
-  Portfolio = c("LLY", "JNJ", "ABBV", "Tan PF (opt)"),
-  alpha_values = c(mean(lly_ex_2 - spy_ex_2), mean(jnj_ex_2 - spy_ex_2), mean(abbv_ex_2 - spy_ex_2), mean(pf_ex_2 - spy_ex_2)),
-  beta_values = c(lly_fit_2$coefficients[2], jnj_fit_2$coefficients[2], abbv_fit_2$coefficients[2], pf_fit_2$coefficients[2])
+  Portfolio = c("TSLA", "TM", "BYDDY", "Auto Industry", "Tan PF (opt)"),
+  alpha_values = c(coef(tsla_fit_2)["(Intercept)"], coef(tm_fit_2)["(Intercept)"], coef(byddy_fit_2)["(Intercept)"], coef(auto_fit_2)["(Intercept)"], coef(pf_fit_2)["(Intercept)"]),
+  beta_values = c(tsla_fit_2$coefficients[2], tm_fit_2$coefficients[2], byddy_fit_2$coefficients[2], auto_fit_2$coefficients[2], pf_fit_2$coefficients[2])
 )
 
 print(alpha_beta_2)
-
-
 ```
 
+A lot of the alphas were very close to 0 and we were unable to reject the null hypothesis (CAPM) for many assets/portfolios. In this period, Tesla and BYDDY, however, had a slightly positive alpha, significant at a 9% significance level. This aligns with the high growth profile of both companies; both companies experienced a lot of public interest during the period.
+Tesla exhibited higher market sensitivity (beta = 1.455).
+Toyota's lower beta (0.663) highlights its stability, while BYD's beta near 1 indicates higher correlation with the market.
+In this period, the Auto Industry's beta was close to 1, largely tracking the market. This indicates a lessening of the stability the industry saw in the previous period.
+The constructed portfolio managed to achieve relatively moderate risk again (beta close to 1).
+
+
+## 7) 
 ```{r}
 S = 1000
 #VaR confidence level =1-alpha
@@ -212,29 +346,33 @@ calc_np <- function(alpha, ret) {
   return(NP)
 }
 
-lly_np = calc_np(0.05, lly_ret)
-jnj_np = calc_np(0.05, jnj_ret)
-abbv_np = calc_np(0.05, abbv_ret)
+tsla_np = calc_np(0.05, tsla_ret)
+tm_np = calc_np(0.05, tm_ret)
+byddy_np = calc_np(0.05, byddy_ret)
+auto_np = calc_np(0.05, auto_ret)
 
-results_df <- data.frame(rbind(lly_np, jnj_np, abbv_np))
+results_df <- data.frame(rbind(tsla_np, tm_np, byddy_np, auto_np))
 
-rownames(results_df) <- c("LLY", "JNJ", "ABBV")
+rownames(results_df) <- c("TSLA", "TM", "BYDDY", "Auto Industry")
 
 results_df
 ```
+TSLA had the highest VaR (43.14) and ES (68.17), TM had the lowest among the individual assets with VaR (16.26) and ES (21.34) and BYD between them with VaR (36.2) and ES (46.62). The VaR and ES for the overall auto industry is very close to Toyota, reflecting a mix of more stable companies like Toyota and higher-risk companies, like Tesla with diversification effects. 
 
-
-
-
-
+## 8)
 ```{r}
-lly_np_2 = calc_np(0.05, lly_ret_2)
-jnj_np_2 = calc_np(0.05, jnj_ret_2)
-abbv_np_2 = calc_np(0.05, abbv_ret_2)
+tsla_np_2 = calc_np(0.05, tsla_ret_2)
+tm_np_2 = calc_np(0.05, tm_ret_2)
+byddy_np_2 = calc_np(0.05, byddy_ret_2)
+auto_np_2 = calc_np(0.05, auto_ret_2)
 
-results_df_2 <- data.frame(rbind(lly_np_2, jnj_np_2, abbv_np_2))
+results_df_2 <- data.frame(rbind(tsla_np_2, tm_np_2, byddy_np_2, auto_np_2))
 
-rownames(results_df_2) <- c("LLY", "JNJ", "ABBV")
+rownames(results_df_2) <- c("TSLA", "TM", "BYDDY", "Auto Industry")
 
 results_df_2
 ```
+
+Both VaR and ES values increased significantly for all companies and the auto industry between 2017–2019 and 2020–2022.
+This suggests higher risk exposure and larger potential losses in extreme scenarios during 2020–2022 compared to 2017–2019. The relative ordering of risk among individual assets stayed the same between periods. The auto industry aggregate become significantly riskier, reflecting the combination of volatile growth companies like Tesla and BYD and more stable companies like Toyota.
+
