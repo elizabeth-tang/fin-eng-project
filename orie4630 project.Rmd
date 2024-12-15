@@ -1,5 +1,6 @@
 ---
-title: "orie4630 project"
+title: "ORIE 4630 Final Project"
+author: "Elizabeth Tang (et362), Manoli Lambrakis (el668), Will MacLeod (wm333)"
 output: html_document
 date: "2024-12-12"
 ---
@@ -141,14 +142,20 @@ years <- list(
   c("2019-01-01", "2019-12-31")
 )
 
-mean_mat_years = get_stats(symbols, years)[1]
-sd_mat_years = get_stats(symbols, years)[2]
+mean_mat_years = get_stats(symbols, years)[[1]]
+sd_mat_years = get_stats(symbols, years)[[2]]
 
 mean_df_years <- data.frame(mean_mat_years, row.names = c("TSLA", "TM", "BYDDY", "Auto Industry"))
 colnames(mean_df_years) <- c("2017", "2018", "2019")
 
 sd_df_years <- data.frame(sd_mat_years, row.names = c("TSLA", "TM", "BYDDY", "Auto Industry"))
 colnames(sd_df_years) <- c("2017", "2018", "2019")
+
+# Round all output tables to 3 decimal places
+mean_df <- round(mean_df, 3)
+sd_df <- round(sd_df, 3)
+mean_df_years <- round(mean_df_years, 3)
+sd_df_years <- round(sd_df_years, 3)
 ```
 
 ## Split by period
@@ -206,7 +213,8 @@ sharpe_ratios = data.frame(
   SD = c(sqrt(diag(cov.mat)[1]), sqrt(diag(cov.mat)[2]), sqrt(diag(cov.mat)[3]), sd(auto_ret), sd_tan)
 )
 
-print(sharpe_ratios, row.names = FALSE)
+sharpe_ratios[,2:3] <- round(sharpe_ratios[,2:3], 3)
+sharpe_ratios
 ```
 
 As we can see in the statistics above, the riskiness (standard deviation) of the individual assets vary. TSLA has the highest SD (0.0306), making it the riskiest asset in the portfolio. BYDDY has a slightly lower SD (0.0233), making it less risky than TSLA, but still riskier than TM. TM actually had a SD similar to CARZ (0.0097 and 0.0098, respectively), indicating relatively low volatility in that individual asset. CARZ's low volatility indicates that the industry as a whole is more stable, likely due to diversification across companies. Our optimal portfolio had a SD of 0.0157 which is slightly higher than the overall industry and TM, but much lower than TSLA and BYDDY. This indicates that our optimization process helped reduce risk through diversification.
@@ -318,7 +326,8 @@ alpha_beta = data.frame(
   beta_values = c(tsla_fit$coefficients[2], tm_fit$coefficients[2], byddy_fit$coefficients[2], auto_fit$coefficients[2], pf_fit$coefficients[2])
 )
 
-print(alpha_beta)
+alpha_beta[,2:3] <- round(alpha_beta[,2:3], 3)
+alpha_beta
 ```
 
 All of the alphas were very close to 0 and we were unable to reject the null hypothesis (CAPM) for any of the assets/portfolios.
@@ -354,7 +363,8 @@ alpha_beta_2 = data.frame(
   beta_values = c(tsla_fit_2$coefficients[2], tm_fit_2$coefficients[2], byddy_fit_2$coefficients[2], auto_fit_2$coefficients[2], pf_fit_2$coefficients[2])
 )
 
-print(alpha_beta_2)
+alpha_beta_2[,2:3] <- round(alpha_beta_2[,2:3], 3)
+alpha_beta_2
 ```
 
 A lot of the alphas were very close to 0 and we were unable to reject the null hypothesis (CAPM) for many assets/portfolios. In this period, Tesla and BYDDY, however, had a slightly positive alpha, significant at a 9% significance level. This aligns with the high growth profile of both companies; both companies experienced a lot of public interest during the period.
@@ -386,6 +396,7 @@ results_df <- data.frame(rbind(tsla_np, tm_np, byddy_np, auto_np))
 
 rownames(results_df) <- c("TSLA", "TM", "BYDDY", "Auto Industry")
 
+results_df <- round(results_df, 3)
 results_df
 ```
 TSLA had the highest VaR (43.14) and ES (68.17), TM had the lowest among the individual assets with VaR (16.26) and ES (21.34) and BYD between them with VaR (36.2) and ES (46.62). The VaR and ES for the overall auto industry is very close to Toyota, reflecting a mix of more stable companies like Toyota and higher-risk companies, like Tesla with diversification effects. 
@@ -399,11 +410,26 @@ auto_np_2 = calc_np(0.05, auto_ret_2)
 
 results_df_2 <- data.frame(rbind(tsla_np_2, tm_np_2, byddy_np_2, auto_np_2))
 
+colnames(results_df_2) <- c("VaR", "ES")
 rownames(results_df_2) <- c("TSLA", "TM", "BYDDY", "Auto Industry")
 
+results_df_2 <- round(results_df_2, 3)
 results_df_2
 ```
 
 Both VaR and ES values increased significantly for all companies and the auto industry between 2017–2019 and 2020–2022.
 This suggests higher risk exposure and larger potential losses in extreme scenarios during 2020–2022 compared to 2017–2019. The relative ordering of risk among individual assets stayed the same between periods. The auto industry aggregate become significantly riskier, reflecting the combination of volatile growth companies like Tesla and BYD and more stable companies like Toyota.
+
+## 9)
+
+  Our analysis of the auto manufacturers sector from 2017-2019 and 2020-2022 shows that careful portfolio construction can improve returns and manage risk better than simply holding the industry ETF (CARZ).
+
+  Before the pandemic (2017-2019), our optimized portfolio delivered better returns per unit of risk than the broad industry. During the pandemic period (2020-2022), despite higher overall volatility, the portfolio again outperformed the industry. This suggests that thoughtful selection of companies, rather than broad exposure, can result in a more efficient risk-return tradeoff, even in unstable times.
+
+  Comparing the two periods, Tesla had the highest market sensitivity (beta), while Toyota maintained a relatively low beta, offering stability. BYD had a beta near 1, aligning closely with market movements. Over time, the industry’s beta moved closer to 1, indicating that during the pandemic, company performance was more in line with overall market trends.
+
+  Tail risk increased significantly from 2017-2019 to 2020-2022. This was likely due to the pandemic’s impact, including supply chain problems, changing consumer behavior, and broader economic uncertainties. Tesla and BYD, as higher-growth firms, saw greater increases in VaR and ES, highlighting their vulnerability to market shocks. Even stable companies like Toyota experienced more downside risk.
+
+  The pandemic years were marked by unprecedented uncertainty, affecting all automakers. While some legacy companies like Toyota remained relatively stable, growth-focused companies like Tesla and BYD faced bigger swings. Overall, our findings emphasize the value of a carefully chosen portfolio, an understanding of market sensitivity, and close attention to risk measures. As the auto industry continues to evolve, investors should remain watchful, balancing potential high returns with the risks of an ever-changing market environment.
+
 
